@@ -1,0 +1,13 @@
+{
+  "include": [
+    "sfos_api",
+    "examples",
+    "tests"
+  ],
+  "extraPaths": [
+    ".",
+    "examples"
+  ],
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "standard"
+}
