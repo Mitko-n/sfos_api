@@ -107,7 +107,17 @@ def main() -> None:
         try:
             test_res = client.test_connection(
                 Authentication.SERVERS_ACTIVE_DIRECTORY,
-                data={"serverIp": "10.0.10.5", "port": 389},
+                data={
+                    "name": "AD",
+                    "serverAddress": {"ipv4Address": "192.168.10.50"},
+                    "connectionSecurity": "none",
+                    "port": 389,
+                    "netBIOSDomain": "sfos",
+                    "adminUsername": "adread",
+                    "password": "Sophos1985!!",
+                    "domainName": "sfos.local",
+                    "searchQueries": ["dc=sfos,dc=local"],
+                },
             )
             print("Connection test result:")
             print_data(test_res)

@@ -80,6 +80,7 @@ class SFOSClient:
 
     @staticmethod
     def _clean_params(params: Mapping[str, Any] | None) -> dict[str, Any] | None:
+        """Remove None values from query parameters dictionary."""
         if params is None:
             return None
         clean = {k: v for k, v in params.items() if v is not None}
@@ -87,15 +88,19 @@ class SFOSClient:
 
     @classmethod
     def _resolve_path(cls, endpoint: str, id_or_name: str | None = None) -> str:
-        base = endpoint
-        if id_or_name:
-            quoted = quote(id_or_name, safe="")
-            if re.search(r"\{[^}]+\}", base):
-                return re.sub(r"\{[^}]+\}", quoted, base, count=1)
-            return f"{base.rstrip('/')}/{quoted}"
-        if re.search(r"\{[^}]+\}", base):
-            raise ValueError(f"Endpoint '{base}' contains path parameters that require 'id_or_name' to be specified.")
-        return base
+        """Resolve the full API path for a given endpoint and optional resource identifier."""
+        has_placeholder = "{idOrName}" in endpoint
+
+        if id_or_name is None:
+            if has_placeholder:
+                raise ValueError(f"Endpoint '{endpoint}' requires 'id_or_name'.")
+            return endpoint
+
+        quoted = quote(str(id_or_name), safe="")
+        if has_placeholder:
+            return endpoint.format(idOrName=quoted)
+
+        return f"{endpoint.rstrip('/')}/{quoted}"
 
     DEFAULT_ERROR_MESSAGES: Final[dict[int, str]] = {
         400: "Bad request.",
@@ -108,6 +113,7 @@ class SFOSClient:
 
     @classmethod
     def _error_details(cls, response: httpx.Response) -> tuple[str, str | None, str | int | None, Any]:
+        """Extract error details from an HTTP response."""
         default_message = cls.DEFAULT_ERROR_MESSAGES.get(response.status_code, response.reason_phrase or "Unexpected error.")
         try:
             body = response.json()
@@ -124,6 +130,7 @@ class SFOSClient:
 
     @classmethod
     def _raise_for_error(cls, response: httpx.Response) -> None:
+        """Raise an appropriate exception based on the HTTP response status code."""
         if not response.is_error:
             return
         message, error, code, body = cls._error_details(response)
@@ -194,7 +201,6 @@ class SFOSClient:
         """
         path = self._resolve_path(endpoint, id_or_name)
         return self.request("POST", path, params=params, json_data=dict(data) if data is not None else None)
-
 
     def read(
         self,
@@ -337,6 +343,7 @@ class SFOSClient:
 
         Raises:
             ValueError: If mutually exclusive modes or filter arguments are provided.
+
         """
         filter_params = {**(params or {}), **kwargs}
 
@@ -348,8 +355,7 @@ class SFOSClient:
         selected_modes = int(has_id) + int(has_items) + int(has_filters)
         if selected_modes != 1:
             raise ValueError(
-                "Provide exactly one deletion mode: single resource ('id_or_name'), "
-                "explicit batch ('items'), or query filters ('params' / filter kwargs)."
+                "Provide exactly one deletion mode: single resource ('id_or_name'), explicit batch ('items'), or query filters ('params' / filter kwargs)."
             )
 
         base = endpoint.rstrip("/")
@@ -367,10 +373,7 @@ class SFOSClient:
         # Mode 2: Query Filter Deletion (via params / kwargs)
         if has_filters:
             if "nameContains" in filter_params and "nameNotEquals" in filter_params:
-                raise ValueError(
-                    "Sophos REST API does not allow 'nameContains' and 'nameNotEquals' together. "
-                    "Specify at most one name filter per request."
-                )
+                raise ValueError("Sophos REST API does not allow 'nameContains' and 'nameNotEquals' together. Specify at most one name filter per request.")
 
             discovered = self.read(endpoint, params=filter_params)
             matched_items = discovered.get("items", []) if isinstance(discovered, dict) else []
@@ -378,20 +381,14 @@ class SFOSClient:
             if not matched_items:
                 return {"matched_count": 0, "deleted_count": 0, "results": []}
 
-            items = [
-                {"name": x["name"]} if "name" in x else {"id": x["id"]}
-                for x in matched_items
-            ]
+            items = [{"name": x["name"]} if "name" in x else {"id": x["id"]} for x in matched_items]
 
         # Mode 3: Batch Deletion (Explicit items or Discovered from Mode 2)
         assert items is not None
         if not items:
             raise ValueError("items must not be empty")
 
-        payload_items: list[dict[str, Any]] = [
-            {"name": item} if isinstance(item, str) else dict(item)
-            for item in items
-        ]
+        payload_items: list[dict[str, Any]] = [{"name": item} if isinstance(item, str) else dict(item) for item in items]
 
         responses: list[Any] = []
         for i in range(0, len(payload_items), chunk_size):
@@ -400,7 +397,6 @@ class SFOSClient:
             responses.append(resp)
 
         return responses[0] if len(responses) == 1 else responses
-
 
     # =========================================================================
     # Convenience Wrappers
@@ -452,8 +448,6 @@ class SFOSClient:
             params=params,
             json_data=dict(data) if data is not None else None,
         )
-
-
 
 
 __version__ = "0.5.0-beta"

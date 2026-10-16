@@ -150,8 +150,10 @@ def test_path_resolution():
 
     # With special chars in name
     assert client._resolve_path(Network.ZONES, "DMZ 1") == "/network/zones/DMZ%201"
+    assert client._resolve_path(Network.ZONES, "branch/1") == "/network/zones/branch%2F1"
 
-    # Parameterized path resolution
+    # Parameterized item and action path resolution
+    assert client._resolve_path("/network/zones/{idOrName}", "LAN") == "/network/zones/LAN"
     assert client._resolve_path(Logging.LOG_DESTINATIONS_SYSLOG_SERVERS_BY_ID_OR_NAME_LOGS, "server-1") == "/logging/log-destinations/syslog-servers/server-1/logs"
 
     # Error when parameter is missing
@@ -263,5 +265,4 @@ def test_crud_mock_calls():
     res = client.test_connection(Authentication.SERVERS_ACTIVE_DIRECTORY, data={"serverIp": "10.0.0.1"})
     assert res["path"] == "/api/firewall-config/v1/authentication/servers/active-directory/test-connection"
     assert res["method"] == "POST"
-
 
